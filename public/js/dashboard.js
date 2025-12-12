@@ -1,211 +1,210 @@
-// public/js/dashboard.js
-// Fail-safe: prevents dashboard crash if initTilt is missing
-window.initTilt = window.initTilt || function(){};
+// =====================================================
+//  AUTO API BASE URL (LOCAL → localhost, PROD → Render)
+// =====================================================
+const API_BASE =
+  window.location.hostname === "localhost"
+    ? "http://localhost:3000"
+    : "https://boltic.onrender.com";
 
+console.log("API Base →", API_BASE);
 
+// =====================================================
+//  GLOBAL STATE
+// =====================================================
 let latestData = [];
 let monitoredUrls = [];
 
 // Cyber-futuristic rotating icons
 const siteIcons = [
-    'fa-microchip',
-    'fa-wave-square',
-    'fa-database',
-    'fa-code-branch',
-    'fa-chart-line'
+  "fa-microchip",
+  "fa-wave-square",
+  "fa-database",
+  "fa-code-branch",
+  "fa-chart-line"
 ];
 
 function iconForIndex(i) {
-    return siteIcons[i % siteIcons.length];
+  return siteIcons[i % siteIcons.length];
 }
 
-/* ----------------------------------------------------
-    RENDER HOME (all websites)
------------------------------------------------------ */
+// =====================================================
+//  RENDER HOME (all websites)
+// =====================================================
 function renderHome() {
-    updateCards(latestData);
-    updateDock(latestData);
+  updateCards(latestData);
+  updateDock(latestData);
 }
 
-/* ----------------------------------------------------
-   UPDATED RENDERER — NO FLICKER, NO DOM WIPE
------------------------------------------------------ */
+// =====================================================
+//  CARD SYSTEM (FAST, NO FLICKER)
+// =====================================================
 function updateCards(data) {
-    const grid = document.getElementById("main-content");
-    const existingCards = grid.querySelectorAll(".card");
+  const grid = document.getElementById("main-content");
+  const existingCards = grid.querySelectorAll(".card");
 
-    // CASE 1: Initial load (no cards exist)
-    if (existingCards.length !== data.length) {
-        grid.innerHTML = "";
-        data.forEach((item, idx) => buildCard(grid, item, idx));
-        if (typeof initTilt === "function") initTilt();
-        return;
-    }
+  if (existingCards.length !== data.length) {
+    grid.innerHTML = "";
+    data.forEach((item, idx) => buildCard(grid, item, idx));
+    if (typeof initTilt === "function") initTilt();
+    return;
+  }
 
-    // CASE 2: Cards exist → update only content (NO DOM rebuild)
-    data.forEach((item, idx) => updateExistingCard(existingCards[idx], item, idx));
+  data.forEach((item, idx) =>
+    updateExistingCard(existingCards[idx], item, idx)
+  );
 }
 
-/* ----------------------------------------------------
-   Build a brand new card (used only initial render)
------------------------------------------------------ */
 function buildCard(grid, item, idx) {
-    const status = item.status || "WAIT";
-    const isUp = status === "UP";
-    const color = isUp ? "#00E88F" : "#ff5f56";
+  const status = item.status || "WAIT";
+  const isUp = status === "UP";
+  const color = isUp ? "#00E88F" : "#ff5f56";
 
-    const latencyTxt = item.latency ? item.latency + "s" : "N/A";
-    const codeTxt = item.code ?? "-";
-    const timestamp = item.timestamp ?? "-";
+  const latencyTxt = item.latency ? item.latency + "s" : "N/A";
+  const codeTxt = item.code ?? "-";
+  const timestamp = item.timestamp ?? "-";
 
-    grid.insertAdjacentHTML(
-        "beforeend",
-        `
-        <div class="card" style="animation: popUp .4s ease forwards ${idx * 0.06}s;">
-            <div class="card-title"><i class="fa ${iconForIndex(idx)}"></i> ${item.url}</div>
-
-            <div class="card-content" style="color:${color};">${status}</div>
-
-            <div class="card-desc">
-                <span class="status-pill ${isUp ? "status-up" : "status-down"}">
-                    ${isUp ? '<i class="fa fa-check"></i> UP' : '<i class="fa fa-times"></i> DOWN'}
-                </span>
-
-                <br><br>
-                Latency: <strong class="latency">${latencyTxt}</strong><br>
-                HTTP: <strong class="code">${codeTxt}</strong><br>
-                Updated: <strong class="timestamp">${timestamp}</strong>
-            </div>
-        </div>
-        
+  grid.insertAdjacentHTML(
+    "beforeend",
     `
-    );
+    <div class="card" style="animation: popUp .4s ease forwards ${idx * 0.06}s;">
+        <div class="card-title"><i class="fa ${iconForIndex(idx)}"></i> ${
+      item.url
+    }</div>
+
+        <div class="card-content" style="color:${color};">${status}</div>
+
+        <div class="card-desc">
+            <span class="status-pill ${
+              isUp ? "status-up" : "status-down"
+            }">
+                ${
+                  isUp
+                    ? '<i class="fa fa-check"></i> UP'
+                    : '<i class="fa fa-times"></i> DOWN'
+                }
+            </span>
+
+            <br><br>
+            Latency: <strong class="latency">${latencyTxt}</strong><br>
+            HTTP: <strong class="code">${codeTxt}</strong><br>
+            Updated: <strong class="timestamp">${timestamp}</strong>
+        </div>
+    </div>
+    `
+  );
 }
 
-/* ----------------------------------------------------
-   Update an existing card's data only (NO flicker)
------------------------------------------------------ */
-function updateExistingCard(card, item, idx) {
-    if (!card) return;
+function updateExistingCard(card, item) {
+  if (!card) return;
 
-    const status = item.status || "WAIT";
-    const isUp = status === "UP";
-    const latencyTxt = item.latency ? item.latency + "s" : "N/A";
-    const codeTxt = item.code ?? "-";
-    const timestamp = item.timestamp ?? "-";
-    const color = isUp ? "#00E88F" : "#ff5f56";
+  const status = item.status || "WAIT";
+  const isUp = status === "UP";
+  const latencyTxt = item.latency ? item.latency + "s" : "N/A";
+  const codeTxt = item.code ?? "-";
+  const timestamp = item.timestamp ?? "-";
+  const color = isUp ? "#00E88F" : "#ff5f56";
 
-    // Update status text + color
-    const contentEl = card.querySelector(".card-content");
-    contentEl.style.color = color;
-    contentEl.innerText = status;
+  card.querySelector(".card-content").style.color = color;
+  card.querySelector(".card-content").innerText = status;
 
-    // Update pill
-    const pill = card.querySelector(".status-pill");
-    pill.className = `status-pill ${isUp ? "status-up" : "status-down"}`;
-    pill.innerHTML = isUp
-        ? '<i class="fa fa-check"></i> UP'
-        : '<i class="fa fa-times"></i> DOWN';
+  const pill = card.querySelector(".status-pill");
+  pill.className = `status-pill ${isUp ? "status-up" : "status-down"}`;
+  pill.innerHTML = isUp
+    ? '<i class="fa fa-check"></i> UP'
+    : '<i class="fa fa-times"></i> DOWN';
 
-    // Update values
-    card.querySelector(".latency").innerText = latencyTxt;
-    card.querySelector(".code").innerText = codeTxt;
-    card.querySelector(".timestamp").innerText = timestamp;
+  card.querySelector(".latency").innerText = latencyTxt;
+  card.querySelector(".code").innerText = codeTxt;
+  card.querySelector(".timestamp").innerText = timestamp;
 }
 
-/* ----------------------------------------------------
-   Update Dock (Home + each website)
------------------------------------------------------ */
+// =====================================================
+//  DOCK (Sidebar icons)
+// =====================================================
 function updateDock(data) {
-    const dock = document.getElementById("dock");
-    dock.innerHTML = "";
+  const dock = document.getElementById("dock");
+  dock.innerHTML = "";
 
-    // HOME BUTTON
-    const homeBtn = document.createElement("div");
-    homeBtn.className = "dock-icon active";
-    homeBtn.innerHTML = `<i class="fa fa-house"></i><span class="dock-tooltip">Home</span>`;
-    homeBtn.onclick = () => {
-        dock.querySelectorAll(".dock-icon").forEach(d => d.classList.remove("active"));
-        homeBtn.classList.add("active");
-        renderHome();
-    };
-    dock.appendChild(homeBtn);
-
-    // SITE BUTTONS
-    data.forEach((item, idx) => {
-        const wrapper = document.createElement("div");
-        wrapper.className = "dock-icon";
-        wrapper.innerHTML = `
-            <i class="fa ${iconForIndex(idx)}"></i>
-            <span class="dock-tooltip">${item.url}</span>
-        `;
-        wrapper.onclick = () => {
-            dock.querySelectorAll(".dock-icon").forEach(d => d.classList.remove("active"));
-            wrapper.classList.add("active");
-            updateCards([item]);   // ← Your original behaviour
-        };
-        dock.appendChild(wrapper);
-    });
-}
-
-/* ----------------------------------------------------
-   Fetch /data from backend
------------------------------------------------------ */
-async function fetchDataFromServer() {
-    try {
-        const r = await fetch("/data");
-        const j = await r.json();
-
-        if (j.ok && Array.isArray(j.data)) {
-            latestData = j.data;
-            monitoredUrls = latestData.map(x => x.url);
-            document.getElementById("server-status").innerText = "online";
-            return true;
-        }
-        return false;
-    } catch (err) {
-        document.getElementById("server-status").innerText = "offline";
-        return false;
-    }
-}
-
-/* ----------------------------------------------------
-   Poll + Update UI
------------------------------------------------------ */
-async function pollAndRender() {
-
-    // Fetch latest backend data ALWAYS
-    const ok = await fetchDataFromServer();
-
-    // ❌ Do NOT re-render UI if terminal in use
-    if (window.TERMINAL_IS_BUSY) {
-        return; // skip UI update
-    }
-
-    // Normal behavior
-    if (!ok && latestData.length === 0) {
-        monitoredUrls = ["https://google.com", "https://github.com"];
-        latestData = monitoredUrls.map(u => ({
-            url: u,
-            status: "WAIT",
-            latency: null,
-            code: null,
-            timestamp: new Date().toLocaleString()
-        }));
-    }
-
+  const homeBtn = document.createElement("div");
+  homeBtn.className = "dock-icon active";
+  homeBtn.innerHTML = `<i class="fa fa-house"></i><span class="dock-tooltip">Home</span>`;
+  homeBtn.onclick = () => {
+    dock.querySelectorAll(".dock-icon").forEach((d) =>
+      d.classList.remove("active")
+    );
+    homeBtn.classList.add("active");
     renderHome();
+  };
+  dock.appendChild(homeBtn);
+
+  data.forEach((item, idx) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "dock-icon";
+    wrapper.innerHTML = `
+      <i class="fa ${iconForIndex(idx)}"></i>
+      <span class="dock-tooltip">${item.url}</span>
+    `;
+    wrapper.onclick = () => {
+      dock.querySelectorAll(".dock-icon").forEach((d) =>
+        d.classList.remove("active")
+      );
+      wrapper.classList.add("active");
+      updateCards([item]);
+    };
+    dock.appendChild(wrapper);
+  });
 }
 
-/* ----------------------------------------------------
-   Auto-start Polling
------------------------------------------------------ */
+// =====================================================
+//  FETCH DATA FROM BACKEND
+// =====================================================
+async function fetchDataFromServer() {
+  try {
+    const r = await fetch(`${API_BASE}/data`);
+    const j = await r.json();
+
+    if (j.ok && Array.isArray(j.data)) {
+      latestData = j.data;
+      monitoredUrls = latestData.map((x) => x.url);
+      document.getElementById("server-status").innerText = "online";
+      return true;
+    }
+    return false;
+  } catch (err) {
+    document.getElementById("server-status").innerText = "offline";
+    return false;
+  }
+}
+
+// =====================================================
+//  POLLING SYSTEM
+// =====================================================
+async function pollAndRender() {
+  const ok = await fetchDataFromServer();
+
+  if (window.TERMINAL_IS_BUSY) return;
+
+  if (!ok && latestData.length === 0) {
+    monitoredUrls = ["https://google.com", "https://github.com"];
+    latestData = monitoredUrls.map((u) => ({
+      url: u,
+      status: "WAIT",
+      latency: null,
+      code: null,
+      timestamp: new Date().toLocaleString()
+    }));
+  }
+
+  renderHome();
+}
+
+// Auto-start polling
 window.addEventListener("load", () => {
-    setTimeout(() => pollAndRender(), 400);
-    setInterval(pollAndRender, 5000);
+  setTimeout(() => pollAndRender(), 400);
+  setInterval(pollAndRender, 5000);
 });
 
-// Expose functions for terminal.js
+// Export for terminal.js
 window.pollAndRender = pollAndRender;
 window.updateCards = updateCards;
 window.updateDock = updateDock;

@@ -1,6 +1,9 @@
 // ==============================
-//  TERMINAL SYSTEM (FULLY FIXED)
+//  TERMINAL SYSTEM
 // ==============================
+
+// Reuse API_BASE from dashboard.js
+// (Make sure <script src="dashboard.js"> loads before this file)
 
 // Terminal element
 let termBody = document.getElementById("terminal-body");
@@ -114,7 +117,7 @@ Available commands:
     // ---------------- LIST ----------------
     else if (lower === "list") {
         try {
-            const r = await fetch("/list");
+            const r = await fetch(`${API_BASE}/list`);
             const j = await r.json();
 
             if (j.ok && j.data.length > 0) {
@@ -135,7 +138,7 @@ Available commands:
             out = "Error: URL must begin with http:// or https://";
         } else {
             try {
-                const r = await fetch("/add", {
+                const r = await fetch(`${API_BASE}/add`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ url })
@@ -146,7 +149,7 @@ Available commands:
                 if (j.ok) {
                     out = `Added → ${url}\nMonitoring will update shortly.`;
                     window.monitoredUrls = j.data;
-                    pollAndRender();
+                    pollAndRender();   // refresh dashboard
                 } else {
                     out = "Error adding website.";
                 }
@@ -161,7 +164,7 @@ Available commands:
         const url = cmd.substring(7).trim();
 
         try {
-            const r = await fetch("/remove", {
+            const r = await fetch(`${API_BASE}/remove`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url })
@@ -187,7 +190,7 @@ Available commands:
             out = "No data yet. Wait 5 seconds.";
         } else {
             out = "[STATUS REPORT]\n\n";
-            window.latestData.forEach(item => {
+            window.latestData.forEach((item) => {
                 out += `${item.url}\n  status: ${item.status}\n  latency: ${item.latency}s\n  code: ${item.code}\n\n`;
             });
         }

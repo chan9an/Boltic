@@ -1,15 +1,21 @@
-// server/server.js
 const express = require("express");
 const axios = require("axios");
+const cors = require("cors");
 const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ===============================
+//    MIDDLEWARE
+// ===============================
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(cors({ origin: "*" }));
+app.use(express.static(path.join(__dirname, "public")));
 
-// In-memory monitored list + latest results
+// ===============================
+//    STATE (in-memory DB)
+// ===============================
 let monitored = [
   "https://kaily.ai",
   "https://boltic.io",
@@ -18,33 +24,27 @@ let monitored = [
   "https://www.fynd.com"
 ];
 
-let results = []; // { url, status, latency, code, timestamp }
+let results = [];
 
-// Helper to normalize URLs
-function normalizeUrl(input) {
-  if (!input) return null;
-  let url = input.trim();
-  if (/^https?\./i.test(url)) url = url.replace(".", "://");
-  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-  try {
-    const parsed = new URL(url);
-    return parsed.href;
-  } catch (e) {
-    return null;
-  }
-}
+// Your Boltic workflow webhook
+const ALERT_WEBHOOK =
+  "https://asia-south1.workflow.boltic.app/beafcc27-f073-43e8-9bbb-89e8bcb487cf";
 
+// ===============================
+//   URL CHECK FUNCTION
+// ===============================
 async function checkUrl(url) {
   try {
     const start = Date.now();
     const res = await axios.get(url, { timeout: 8000 });
     const latency = (Date.now() - start) / 1000;
+
     return {
       url,
       status: res.status === 200 ? "UP" : "DOWN",
       latency,
       code: res.status,
-      timestamp: new Date().toLocaleString()
+      timestamp: new Date().toISOString()
     };
   } catch (err) {
     return {
@@ -52,33 +52,57 @@ async function checkUrl(url) {
       status: "DOWN",
       latency: null,
       code: err.response ? err.response.status : null,
-      timestamp: new Date().toLocaleString()
+      timestamp: new Date().toISOString()
     };
   }
 }
 
-async function runChecks() {
-  const arr = [];
-  for (const url of monitored) {
-    try {
-      const r = await checkUrl(url);
-      arr.push(r);
-    } catch (e) {
-      arr.push({
-        url,
-        status: "DOWN",
-        latency: null,
-        code: null,
-        timestamp: new Date().toLocaleString()
-      });
-    }
+// ===============================
+//  SEND ALERT TO BOLTIC AUTOMATION
+// ===============================
+async function sendAlert(data) {
+  try {
+    await axios.post(ALERT_WEBHOOK, data, {
+      headers: { "Content-Type": "application/json" }
+    });
+    console.log("⚠️ Sent alert for DOWN site:", data.url);
+  } catch (err) {
+    console.log("❌ Failed to send alert:", err.message);
   }
-  results = monitored.map(u => arr.find(a => a.url === u) || { url: u, status: "DOWN", latency: null, code: null, timestamp: new Date().toLocaleString() });
 }
 
-runChecks();
-setInterval(runChecks, 5000);
+// ===============================
+//   MAIN MONITOR LOOP (2 mins)
+// ===============================
+async function runChecks() {
+  console.log("🔁 Running check cycle…");
 
+  for (const url of monitored) {
+    const r = await checkUrl(url);
+
+    // Always send alert if DOWN
+    if (r.status === "DOWN") {
+      sendAlert(r);
+    }
+
+    // Update results array
+    const idx = results.findIndex((x) => x.url === url);
+    if (idx === -1) results.push(r);
+    else results[idx] = r;
+  }
+
+  console.log("✅ Check cycle completed.");
+}
+
+// Run once on startup
+runChecks();
+
+// Run every 2 minutes
+setInterval(runChecks, 120000);
+
+// ===============================
+//       API ENDPOINTS
+// ===============================
 app.get("/data", (req, res) => {
   return res.json({ ok: true, data: results });
 });
@@ -87,33 +111,53 @@ app.get("/list", (req, res) => {
   return res.json({ ok: true, data: monitored });
 });
 
-app.post("/add", (req, res) => {
-  const raw = (req.body && req.body.url) || req.query.url;
-  const normalized = normalizeUrl(raw);
-  if (!normalized) return res.status(400).json({ ok: false, error: "Invalid URL" });
-  if (!monitored.includes(normalized)) {
-    monitored.push(normalized);
-    checkUrl(normalized).then(r => {
-      results = results.filter(x => x.url !== normalized).concat(r);
-    }).catch(()=>{});
+// -------------------------------
+// ADD URL (instant check + alert)
+// -------------------------------
+app.post("/add", async (req, res) => {
+  let url = req.body.url;
+  if (!url) return res.status(400).json({ ok: false, error: "URL missing" });
+
+  if (!url.startsWith("http")) url = "https://" + url;
+
+  if (!monitored.includes(url)) {
+    monitored.push(url);
+
+    // Immediately check the new website
+    const r = await checkUrl(url);
+    results.push(r);
+
+    // Alert if DOWN
+    if (r.status === "DOWN") sendAlert(r);
+
+    console.log("➕ Added:", url);
   }
+
   return res.json({ ok: true, data: monitored });
 });
 
+// -------------------------------
+// REMOVE URL
+// -------------------------------
 app.post("/remove", (req, res) => {
-  const raw = (req.body && req.body.url) || req.query.url;
-  const normalized = normalizeUrl(raw);
-  if (!normalized) return res.status(400).json({ ok: false, error: "Invalid URL" });
-  monitored = monitored.filter(u => u !== normalized);
-  results = results.filter(r => r.url !== normalized);
+  const url = req.body.url;
+  monitored = monitored.filter((u) => u !== url);
+  results = results.filter((x) => x.url !== url);
+
+  console.log("➖ Removed:", url);
   return res.json({ ok: true, data: monitored });
 });
 
-// regex fallback (safe for express v5)
+// -------------------------------
+// SPA FRONTEND FALLBACK
+// -------------------------------
 app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// ===============================
+//       START SERVER
+// ===============================
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
