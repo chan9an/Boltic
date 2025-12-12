@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vicky | Odoo Developer Portfolio</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;500;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 1. CORE VARIABLES & ANIMATIONS --- */
+        :root {
+            --bg-dark: #0a0a0a;
+            --card-glass: rgba(30, 41, 59, 0.7);
+            --odoo-purple: #714B67;
+            --odoo-green: #00E88F;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        @keyframes gradient-move {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(-45deg, #0f172a, #1e1b4b, #312e81, #0f172a);
+            background-size: 400% 400%;
+            animation: gradient-move 15s ease infinite;
+            color: var(--text-main);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding-bottom: 120px;
+            overflow-x: hidden;
+        }
+
+        /* --- BACKGROUND CANVAS (PARTICLES) --- */
+        #bg-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; opacity: 0.6; pointer-events: none;
+        }
+
+        /* --- 2. TERMINAL --- */
+        .terminal-container {
+            width: 90%; max-width: 1000px; margin-top: 40px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            z-index: 10;
+        }
+
+        .terminal-header {
+            background: #1e293b; padding: 10px 15px; display: flex; align-items: center; border-bottom: 1px solid #334155;
+        }
+        .controls { display: flex; gap: 8px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .red { background: #ff5f56; } .yellow { background: #ffbd2e; } .green { background: #27c93f; }
+        .tab { margin-left: 20px; background: #0f172a; padding: 5px 15px; border-radius: 5px 5px 0 0; font-size: 0.8rem; color: var(--odoo-green); display: flex; align-items: center; gap: 8px; }
+        
+        .terminal-body { 
+            padding: 20px; 
+            font-family: 'Fira Code', monospace; 
+            font-size: 0.95rem; 
+            min-height: 100px; max-height: 200px;
+            overflow-y: auto; cursor: text;
+        }
+        
+        .command-line { display: flex; flex-wrap: wrap; }
+        .prompt { color: var(--odoo-green); margin-right: 8px; text-shadow: 0 0 5px rgba(0, 232, 143, 0.3); }
+        .input-area { 
+            background: transparent; border: none; color: #fff; 
+            font-family: 'Fira Code', monospace; font-size: 0.95rem; 
+            outline: none; flex: 1; min-width: 50px;
+        }
+        .output { margin-bottom: 10px; color: #cbd5e1; white-space: pre-wrap; margin-left: 20px;}
+
+        /* --- 3. BENTO GRID --- */
+        .bento-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px;
+            width: 90%; max-width: 1000px; margin-top: 30px; perspective: 1000px;
+        }
+
+        .card {
+            background: var(--card-glass);
+            border-radius: 24px; padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.1s ease; position: relative;
+            overflow: hidden; transform-style: preserve-3d; cursor: default;
+            opacity: 0; transform: translateY(20px);
+        }
+
+        @keyframes popUp {
+            to { opacity: 1; transform: translateY(0) perspective(1000px); }
+        }
+
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 24px; padding: 2px;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude; opacity: 0.5; pointer-events: none;
+        }
+
+        .card:hover { box-shadow: 0 0 20px rgba(113, 75, 103, 0.4); border-color: rgba(113, 75, 103, 0.5); }
+        .card-large { grid-column: span 2; } .card-tall { grid-row: span 2; }
+        .card-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .card-content { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; background: linear-gradient(to right, #fff, #cbd5e1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card-desc { font-size: 0.95rem; color: #94a3b8; line-height: 1.6; }
+        
+        .code-box { background: #0f172a; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 0.8rem; border-left: 3px solid var(--odoo-purple); margin-top: 15px; opacity: 0.9; transform: translateZ(20px); }
+        .kw { color: #c084fc; } .str { color: #34d399; } .func { color: #60a5fa; }
+        
+        .skill-tag { display: inline-block; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; margin-right: 5px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.1); position: relative; z-index: 10; cursor: pointer; }
+
+        /* --- 4. DOCK --- */
+        .dock-container { position: fixed; bottom: 30px; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(15px); padding: 12px 25px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.15); display: flex; gap: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); z-index: 100; animation: float 6s ease-in-out infinite; }
+        .dock-icon { width: 50px; height: 50px; background: #1e293b; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #e2e8f0; transition: all 0.3s; cursor: pointer; position: relative; border-top: 1px solid rgba(255,255,255,0.1); }
+        .dock-icon.active { background: var(--odoo-purple); color: white; transform: translateY(-15px) scale(1.1); box-shadow: 0 10px 20px rgba(113, 75, 103, 0.4); }
+        .dock-icon:hover { transform: translateY(-10px) scale(1.1); background: var(--odoo-green); color: black; }
+        .dock-tooltip { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); background: black; color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; opacity: 0; transition: 0.2s; pointer-events: none; white-space: nowrap; }
+        .dock-icon:hover .dock-tooltip { opacity: 1; top: -50px; }
+
+        /* --- PRELOADER --- */
+        #preloader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--odoo-green); font-family: 'Fira Code', monospace; transition: opacity 0.5s ease; }
+        .loader-bar { width: 200px; height: 3px; background: #334155; margin-top: 10px; border-radius: 3px; overflow: hidden; }
+        .loader-progress { width: 0%; height: 100%; background: var(--odoo-green); animation: load 1.5s ease forwards; }
+        @keyframes load { 0% { width: 0%; } 100% { width: 100%; } }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+
+        @media (max-width: 768px) {
+            .bento-grid { grid-template-columns: 1fr; }
+            .card-large, .card-tall { grid-column: span 1; grid-row: span 1; }
+            .terminal-container { width: 95%; margin-top: 20px; }
+            .card { transform: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="preloader">
+        <div style="margin-bottom: 10px;">INITIALIZING SYSTEM...</div>
+        <div class="loader-bar"><div class="loader-progress"></div></div>
+    </div>
+
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="controls"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div>
+            <div class="tab"><i class="fab fa-python"></i> main.py</div>
+        </div>
+        <div class="terminal-body" id="terminal-body" onclick="focusInput()"></div>
+    </div>
+
+    <div class="bento-grid" id="main-content"></div>
+
+    <div class="dock-container">
+        <div class="dock-icon active" onclick="loadPage('home', this)"><i class="fas fa-home"></i><span class="dock-tooltip">Home</span></div>
+        <div class="dock-icon" onclick="loadPage('projects', this)"><i class="fas fa-code-branch"></i><span class="dock-tooltip">Projects</span></div>
+        <div class="dock-icon" onclick="loadPage('resume', this)"><i class="fas fa-file-alt"></i><span class="dock-tooltip">Resume</span></div>
+        <div class="dock-icon" onclick="loadPage('contact', this)"><i class="fas fa-paper-plane"></i><span class="dock-tooltip">Contact</span></div>
+    </div>
+
+    <script>
+        // --- 1. PARTICLE BACKGROUND ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let particlesArray;
+        const mouse = { x: null, y: null, radius: 150 };
+
+        window.addEventListener('mousemove', (event) => { mouse.x = event.x; mouse.y = event.y; });
+
+        class Particle {
+            constructor(x, y, directionX, directionY, size, color) {
+                this.x = x; this.y = y;
+                this.directionX = directionX; this.directionY = directionY;
+                this.size = size; this.color = color;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+            update() {
+                if (this.x > canvas.width || this.x < 0) this.directionX = -this.directionX;
+                if (this.y > canvas.height || this.y < 0) this.directionY = -this.directionY;
+                
+                let dx = mouse.x - this.x; let dy = mouse.y - this.y;
+                let distance = Math.sqrt(dx*dx + dy*dy);
+                if (distance < mouse.radius + this.size){
+                    if(mouse.x < this.x && this.x < canvas.width - this.size * 10) this.x += 2;
+                    if(mouse.x > this.x && this.x > this.size * 10) this.x -= 2;
+                    if(mouse.y < this.y && this.y < canvas.height - this.size * 10) this.y += 2;
+                    if(mouse.y > this.y && this.y > this.size * 10) this.y -= 2;
+                }
+                this.x += this.directionX; this.y += this.directionY;
+                this.draw();
+            }
+        }
+
+        function initParticles() {
+            particlesArray = [];
+            let numberOfParticles = (canvas.height * canvas.width) / 10000;
+            for (let i = 0; i < numberOfParticles; i++) {
+                let size = (Math.random() * 2) + 1;
+                let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
+                let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
+                let directionX = (Math.random() * 2) - 1; let directionY = (Math.random() * 2) - 1;
+                let color = Math.random() > 0.5 ? '#714B67' : '#00E88F'; 
+                particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+            }
+        }
+
+        function animateParticles() {
+            requestAnimationFrame(animateParticles);
+            ctx.clearRect(0, 0, innerWidth, innerHeight);
+            for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); }
+            connect();
+        }
+
+        function connect() {
+            for (let a = 0; a < particlesArray.length; a++) {
+                for (let b = a; b < particlesArray.length; b++) {
+                    let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) + ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y));
+                    if (distance < (canvas.width/7) * (canvas.height/7)) {
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                        ctx.lineWidth = 1; ctx.beginPath();
+                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        window.addEventListener('resize', () => { canvas.width = innerWidth; canvas.height = innerHeight; initParticles(); });
+        initParticles(); animateParticles();
+
+
+        // --- 2. INTERACTIVE TERMINAL LOGIC ---
+        const termBody = document.getElementById('terminal-body');
+        const introLines = ["python odoo-bin -u all", "Loading Modules... Done", "Starting server on :8069", "Type 'help' for available commands."];
+        let lineIndex = 0;
+
+        function typeIntro() {
+            if (lineIndex < introLines.length) {
+                const div = document.createElement('div');
+                div.innerHTML = `<span style="color:#27c93f">➜</span> ${introLines[lineIndex]}`;
+                termBody.appendChild(div);
+                lineIndex++; setTimeout(typeIntro, 300);
+            } else { createInputLine(); }
+        }
+
+        function createInputLine() {
+            const line = document.createElement('div');
+            line.className = 'command-line';
+            line.innerHTML = `<span class="prompt">vicky@odoo-dev:~/portfolio$</span><input type="text" class="input-area" autofocus spellcheck="false">`;
+            termBody.appendChild(line);
+            termBody.scrollTop = termBody.scrollHeight;
+            const input = line.querySelector('input');
+            input.focus();
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const cmd = this.value.trim().toLowerCase();
+                    this.disabled = true; handleCommand(cmd);
+                }
+            });
+        }
+
+        function focusInput() { const activeInput = document.querySelector('.input-area:not([disabled])'); if (activeInput) activeInput.focus(); }
+
+        function handleCommand(cmd) {
+            let output = '';
+            switch(cmd) {
+                case 'help': output = 'Available commands: <span style="color:#00E88F">home, projects, resume, contact, clear</span>'; break;
+                case 'projects': loadPage('projects'); output = 'Executing: Navigation to Projects...'; break;
+                case 'resume': loadPage('resume'); output = 'Executing: Fetching Resume...'; break;
+                case 'contact': loadPage('contact'); output = 'Executing: Opening Contact Protocol...'; break;
+                case 'home': loadPage('home'); output = 'Executing: Returning Home...'; break;
+                case 'clear': termBody.innerHTML = ''; createInputLine(); return; 
+                case '': break;
+                default: output = `Command '${cmd}' not found. Try 'help'.`;
+            }
+            if (output) {
+                const outDiv = document.createElement('div');
+                outDiv.className = 'output'; outDiv.innerHTML = output; termBody.appendChild(outDiv);
+            }
+            createInputLine();
+        }
+
+        setTimeout(typeIntro, 1000);
+
+
+        // --- 3. PAGE CONTENT & LOGIC ---
+        function initTilt() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const rotateX = ((e.clientY - rect.top - rect.height / 2) / rect.height / 2) * -5;
+                    const rotateY = ((e.clientX - rect.left - rect.width / 2) / rect.width / 2) * 5;
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+                });
+                card.addEventListener('mouseleave', () => { card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)'; });
+            });
+        }
+
+        const pages = {
+            'home': `
+                <div class="card card-large">
+                    <div class="card-title"><i class="fas fa-id-badge"></i> Profile</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1;">
+                            <div class="card-content">Hi, I'm Vicky.</div>
+                            <div class="card-desc">
+                                <b>Odoo Developer</b> at <b style="color:var(--odoo-green)">Assert IT Solutions</b>.<br>
+                                Promoted from Intern to Full-time. Crafting scalable ERP solutions with Python, XML & PostgreSQL.
+                            </div>
+                            <div style="margin-top:20px; display:flex; gap:10px;">
+                                <a href="https://www.linkedin.com/in/vicky-kumar-016479302" target="_blank" class="skill-tag" style="background:#0077b5; border:none; color:white; text-decoration:none;"><i class="fab fa-linkedin"></i> LinkedIn</a>
+                                <a href="mailto:vicky@gmail.com" class="skill-tag" style="background:#ea4335; border:none; color:white; text-decoration:none;"><i class="fas fa-envelope"></i> Email</a>
+                            </div>
+                        </div>
+                        <div style="flex-shrink: 0; width: 120px; height: 120px; border-radius: 50%; overflow: hidden; border: 3px solid var(--odoo-purple); box-shadow: 0 0 20px rgba(113, 75, 103, 0.5); transform: translateY(-20px);">
+                            <img src="vicky_odoo.png" onerror="this.src='https://ui-avatars.com/api/?name=Vicky+Odoo&background=714B67&color=fff'" alt="Vicky" style="width: 100%; height: 100%; object-fit: cover; object-position: 80% 60%; transform: scale(1.1);">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><i class="fas fa-layer-group"></i> Stack</div>
+                    <div style="font-size: 2.2rem; display: flex; align-items: center; gap: 15px; margin-top:10px;">
+                        <img src="https://images.seeklogo.com/logo-png/32/1/odoo-logo-png_seeklogo-320087.png" alt="Odoo" style="height: 35px; width: auto; filter: drop-shadow(0 0 5px rgba(113, 75, 103, 0.6));">
+                        <i class="fab fa-python" style="color: #FFE873;"></i>
+                        <i class="fab fa-js" style="color: #F7DF1E;"></i>
+                        <i class="fas fa-database" style="color: #336791;"></i>
+                        <i class="fas fa-code" style="color: #E44D26;"></i>
+                    </div>
+                    <div style="margin-top:15px;">
+                        <span class="skill-tag">Odoo 18</span><span class="skill-tag">OWL</span><span class="skill-tag">Python</span><span class="skill-tag">XML</span><span class="skill-tag">Postgresql</span>
+                    </div>
+                </div>
+
+                <div class="card card-tall" style="border-color: var(--odoo-purple);">
+                    <div class="card-title" style="color: var(--odoo-green);"><i class="fas fa-star"></i> Featured</div>
+                    <div class="card-content">College Pay System</div>
+                    <div class="card-desc">Implemented custom "Payment Receipt" generation & designed Action Buttons for student fee management.</div>
+                    <div class="code-box">
+                        <span class="kw">def</span> <span class="func">action_print_receipt</span>(self):<br>&nbsp;&nbsp;<span class="kw">return</span> self.env.ref(<span class="str">'module.report_id'</span>)
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><i class="fas fa-briefcase"></i> Current Role</div>
+                    <div class="card-content" style="color: var(--odoo-green); font-size: 1.5rem;">Odoo Developer</div>
+                    <div class="card-desc" style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                        <img src="assert_logo.png" onerror="this.style.display='none'" alt="Assert IT" style="height: 35px; width: auto; background: white; padding: 4px; border-radius: 4px;"> 
+                        <span>Full-time at <b>Assert IT Solutions</b></span>
+                    </div>
+                </div>
+
+                <div class="card" onclick="window.open('job_resume odoo developer.pdf')" style="cursor:pointer; background: linear-gradient(135deg, var(--odoo-purple), #5b21b6);">
+                    <div class="card-title" style="color:rgba(255,255,255,0.8);">Quick Action</div>
+                    <div class="card-content" style="font-size:1.4rem; color:white;"><i class="fas fa-download"></i> Resume</div>
+                </div>
+            `,
+
+            'projects': `
+                <div class="card card-large">
+                    <div class="card-title" style="color:#00E88F">UI & Reporting</div>
+                    <div class="card-content">POS & QWeb Reports</div>
+                    <div class="card-desc">
+                        • <b>POS:</b> Customized Point of Sale UI/UX for specific retail needs.<br>
+                        • <b>Reports:</b> Designed pixel-perfect <b>Purchase Order</b> templates & <b>Ledger Reports</b> tailored to client branding.
+                    </div>
+                    <div class="code-box"><span class="kw">&lt;template</span> <span class="kw">id=</span><span class="str">"report_po_custom"</span> <span class="kw">inherit_id=</span><span class="str">"purchase.report_purchaseorder"</span>&gt;</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title" style="color:#00E88F">Education ERP</div>
+                    <div class="card-content">Payment System</div>
+                    <div class="card-desc">Designed PDF Receipts and added custom Action Buttons for college fee collection module.</div>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, #1e293b, #0f172a);">
+                    <div class="card-title" style="color:#00E88F">Training</div>
+                    <div class="card-content">Client Success</div>
+                    <div class="card-desc">Delivered on-site functional training for Purchase, Sales, Inventory & Manufacturing workflows to end-users.</div>
+                </div>
+
+                <div class="card card-large">
+                    <div class="card-title" style="color:#00E88F">Backend Logic</div>
+                    <div class="card-content">Custom Modules</div>
+                    <div class="card-desc">
+                        • <b>Project App:</b> Added custom Status stages & validation logic.<br>
+                        • <b>Development:</b> Built numerous standalone custom modules for specific business logic requirements.
+                    </div>
+                </div>
+            `,
+
+            'resume': `
+                <div class="card card-large"><div class="card-title">Education</div><div class="card-content">BCA (2025)</div><div class="card-desc">IPEM Group of Institutions, Ghaziabad</div></div>
+                <a class="card" href="Vicky_Odoo_Resume.pdf" download="Vicky_Odoo_Resume.pdf" style="text-decoration:none; background: var(--odoo-purple); display:flex; flex-direction:column; justify-content:center;">
+                    <div class="card-content" style="color:white; text-align:center;"><i class="fas fa-file-download" style="font-size:3rem; margin-bottom:10px;"></i><br>Download PDF</div>
+                </a>
+                <div class="card card-tall"><div class="card-title">Professional Skills</div><div class="card-desc"><b style="color:white;">Core:</b> Python, PostgreSQL, XML<br><b style="color:white;">Odoo:</b> Module Dev, QWeb, OWL<br><b style="color:white;">Tools:</b> VS Code, Git, Bitbucket, Jupyter, Canva</div></div>
+            `,
+
+            'contact': `
+                <div class="card card-large">
+                    <div class="card-title">Professional Status</div><div class="card-content">Currently Working</div>
+                    <div class="card-desc">
+                        Full-time <b>Odoo Developer</b> at Assert IT Solutions.<br>
+                        Open to connecting with like-minded developers.
+                        <br><br>
+                        <a href="mailto:vicky875014@gmail.com" style="color:var(--odoo-green); text-decoration:none; font-size:1.1rem; position: relative; z-index: 10;"><i class="fas fa-envelope"></i> vicky875014@gmail.com</a>
+                        <br>
+                        <a href="https://wa.me/918750148077" style="color:#25D366; text-decoration:none; font-size:1.1rem; position: relative; z-index: 10; margin-top: 8px; display:inline-block;"><i class="fab fa-whatsapp"></i> +91 8750148077</a>
+                    </div>
+                </div>
+                <div class="card" onclick="window.open('https://www.linkedin.com/in/vicky-kumar-016479302')" style="cursor:pointer; background:#0077b5;">
+                    <div class="card-title" style="color:#eee;">Professional</div>
+                    <div class="card-content" style="color:white;"><i class="fab fa-linkedin"></i> LinkedIn</div>
+                    <div class="card-desc">Let's connect.</div>
+                </div>
+                <div class="card" onclick="window.open('https://github.com/vicky-5556')" style="cursor:pointer; background:#181717;">
+                    <div class="card-title" style="color:#aaa;">Source Code</div>
+                    <div class="card-content" style="color:white;"><i class="fab fa-github"></i> GitHub</div>
+                </div>
+            `
+        };
+
+        function loadPage(pageName, element) {
+            document.querySelectorAll('.dock-icon').forEach(icon => icon.classList.remove('active'));
+            if(element) element.classList.add('active');
+            else { const iconMap = {'home':0, 'projects':1, 'resume':2, 'contact':3}; const icons = document.querySelectorAll('.dock-icon'); if(icons[iconMap[pageName]]) icons[iconMap[pageName]].classList.add('active'); }
+
+            const grid = document.getElementById('main-content');
+            grid.innerHTML = ''; grid.innerHTML = pages[pageName];
+            
+            const cards = grid.querySelectorAll('.card');
+            cards.forEach((card, index) => { card.style.animation = `popUp 0.5s ease forwards ${index * 0.1}s`; });
+            initTilt();
+        }
+        
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('preloader').style.opacity = '0';
+                setTimeout(() => { document.getElementById('preloader').style.display = 'none'; }, 500);
+            }, 1500);
+        });
+
+        loadPage('home', document.querySelector('.dock-icon.active'));
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
